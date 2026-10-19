@@ -1,0 +1,109 @@
+import { useEffect, useState } from 'react';
+import { Monitor, Server, Cpu, MemoryStick, HardDrive, Users, AlertTriangle, CheckCircle2, XCircle, History, SquareTerminal, ArrowRightLeft, RefreshCw, Laptop } from 'lucide-react';
+import { useApi, setMachine, currentMachine, fmtBytes } from '@hostwerk/api';
+import { Btn, Loading } from '@hostwerk/ui';
+import { t } from '@hostwerk/i18n';
+import ServerBackups from './Backups';
+
+/*
+ * Every machine at a glance: this PC and every paired server with load, storage, services, players, problems and the
+ * last backup. Refreshes every 30 seconds. Also shown on the dashboard (slot "machines.board").
+ */
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+const level = (p) => (p >= 90 ? 'err' : p >= 75 ? 'warn' : 'ok');
+const ago = (day) => {
+  if (!day) return null;
+  const d = Math.round((Date.now() - new Date(`${day}T03:30:00`).getTime()) / 86400000);
+  return d <= 0 ? t('today') : d === 1 ? t('yesterday') : t('{n} days ago', { n: d });
+};
+
+function Meter({ icon: I, label, value, text }) {
+  return (
+    <div className="mb-meter" title={label}>
+      <I size={12} />
+      <div className="mb-bar"><span className={level(value)} style={{ width: `${Math.min(100, value)}%` }} /></div>
+      <span className="tiny">{text}</span>
+    </div>
+  );
+}
+
+function Tile({ m, onBackups, compact }) {
+  const cur = currentMachine();
+  const isLocal = m.local;
+  const memP = m.mem ? pct(m.mem.used, m.mem.total) : 0;
+  const diskP = m.disk ? pct(m.disk.total - m.disk.free, m.disk.total) : 0;
+  // Older Hostwerk versions on paired machines may not send a service or problem list
+  const sv = m.services || { running: 0, total: 0, errors: [] };
+  const probs = m.problems || [];
+  const bad = !m.online || (sv.errors || []).length || probs.length;
+  const backupAge = ago(m.lastBackup);
+  const staleBackup = !isLocal && m.lastBackup && (Date.now() - new Date(`${m.lastBackup}T03:30:00`).getTime()) > 2 * 86400000;
+  return (
+    <div className={`mb-tile ${!m.online ? 'off' : bad ? 'bad' : ''}`}>
+      <div className="mb-head">
+        <span className="mb-ico">{isLocal ? <Laptop size={16} /> : <Server size={16} />}</span>
+        <div className="grow" style={{ minWidth: 0 }}>
+          <b className="ellipsis">{m.name}</b>
+          <div className="tiny muted ellipsis">{m.online ? `${m.host || ''}${m.version ? ` · Hostwerk ${m.version}` : ''}` : m.error || t('not reachable')}</div>
+        </div>
+        {m.online ? (bad ? <AlertTriangle size={16} className="c-warn" aria-label={t('Needs attention')} /> : <CheckCircle2 size={16} className="c-ok" aria-label={t('All fine')} />) : <XCircle size={16} className="c-err" aria-label={t('not reachable')} />}
+      </div>
+      {m.online && (
+        <>
+          <div className="mb-meters">
+            <Meter icon={Cpu} label={t('Processor')} value={m.cpu || 0} text={m.cpu == null ? '–' : `${Math.round(m.cpu)} %`} />
+            <Meter icon={MemoryStick} label={t('Memory')} value={memP} text={`${memP} %`} />
+            {m.disk && <Meter icon={HardDrive} label={t('Disk space')} value={diskP} text={t('{size} free', { size: fmtBytes(m.disk.free) })} />}
+          </div>
+          <div className="mb-facts small">
+            <span>{t('{running}/{total} services', { running: sv.running, total: sv.total })}</span>
+            {m.players > 0 && <span><Users size={11} /> {t('{n} players', { n: m.players })}</span>}
+            {!isLocal && <span className={staleBackup ? 'c-warn' : ''}><History size={11} /> {backupAge ? t('Backup {age}', { age: backupAge }) : t('no backup')}</span>}
+          </div>
+          {!compact && ((sv.errors || []).length > 0 || probs.length > 0) && (
+            <ul className="mb-problems tiny">
+              {(sv.errors || []).map((n) => <li key={n}>{t('{name}: error', { name: n })}</li>)}
+              {probs.slice(0, 3).map((p) => <li key={p}>{p}</li>)}
+            </ul>
+          )}
+        </>
+      )}
+      {!compact && (
+        <div className="mb-actions">
+          {!isLocal && cur !== m.id && <Btn className="xs primary" icon={ArrowRightLeft} disabled={!m.online} onClick={() => setMachine(m.id)}>Operate</Btn>}
+          {isLocal && cur && <Btn className="xs primary" icon={ArrowRightLeft} onClick={() => setMachine(null)}>Operate</Btn>}
+          <Btn className="xs ghost" icon={SquareTerminal} disabled={!m.online} onClick={() => { location.hash = '/terminal'; if (!isLocal && cur !== m.id) setMachine(m.id); if (isLocal && cur) setMachine(null); }}>Terminal</Btn>
+          {!isLocal && <Btn className="xs ghost" icon={History} onClick={() => onBackups(m)}>Backups</Btn>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function MachinesBoard({ compact = false }) {
+  // Offline machines answer only after 8 s – no reload on every live event (that would throw away each slow answer); own 30 s cycle below
+  const o = useApi('/machines/overview', [], { live: false, poll: false });
+  useEffect(() => { const x = setInterval(() => o.reload({ silent: true }), 30000); return () => clearInterval(x); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [backups, setBackups] = useState(null);
+  const list = Array.isArray(o.data) ? o.data : null;
+  // On the dashboard the tile only shows up once another machine is paired
+  if (compact && list && list.length < 2) return null;
+  const online = list ? list.filter((m) => m.online).length : 0;
+  return (
+    <div className="card">
+      <div className="card-head"><Monitor size={16} /><h3>Every machine at a glance</h3>
+        {list && <span className="badge">{t('{online} of {total} reachable', { online, total: list.length })}</span>}
+        <div className="right row-tight">{!compact && <button className="btn ghost sm icon" title="Reload" aria-label={t('Reload')} onClick={o.reload}><RefreshCw /></button>}{compact && <a className="btn sm" href="#/ext/hostwerk-network">Manage</a>}</div>
+      </div>
+      <div className="card-body">
+        {!list ? <Loading text="Asking the machines …" /> : (
+          <div className={`mb-grid ${compact ? 'compact' : ''}`}>
+            {list.map((m) => <Tile key={m.id} m={m} compact={compact} onBackups={setBackups} />)}
+          </div>
+        )}
+        {list && list.length === 1 && !compact && <div className="small muted" style={{ marginTop: 10 }}>No other machine paired yet – use “Add machine” below or set up a server with one click.</div>}
+      </div>
+      {backups && <ServerBackups machine={backups} onClose={() => setBackups(null)} />}
+    </div>
+  );
+}
