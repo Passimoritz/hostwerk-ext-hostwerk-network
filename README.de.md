@@ -10,6 +10,7 @@ Mehrere Rechner als ein Verbund: Laptop, Heim- und Mietserver koppeln, von hier 
 
 ## Was sie kann
 
+- **Wo:** System → Rechner – seit 1.2.1 ohne eigenen Seitenleisten-Eintrag; die ganze Seite bleibt unter Erweiterungen → Öffnen
 - Andere Hostwerk-Installationen per Code koppeln – Zertifikat festgehalten, Schlüssel verschlüsselt gespeichert
 - Die ganze Oberfläche in der Titelleiste auf einen anderen Rechner umschalten
 - Alle Rechner auf einen Blick: Auslastung, Speicher, Platte, Dienste, Spieler, Probleme, letzte Sicherung – ab Hostwerk 3.0 auch ein bereites Update, die eigene letzte Sicherung des Rechners und seine Gesundheits-Punktzahl

@@ -1,3 +1,7 @@
+## 1.2.1
+
+- Lives where it belongs: System → Computers – no own sidebar entry any more (Hostwerk 3.0+); the full page stays under Extensions → Open and can be pinned in the sidebar settings. / Steckt jetzt dort, wo sie hingehört: System → Rechner – kein eigener Seitenleisten-Eintrag mehr (Hostwerk 3.0+); die ganze Seite bleibt unter Erweiterungen → Öffnen und lässt sich in den Seitenleisten-Einstellungen anheften.
+
 ## 1.2.0
 
 - Every machine tile shows what the other side's `/summary` brings from Hostwerk 3.0 on: an update that is ready, its own last backup (local or external, with a hint if the external one failed) and the health score. Older machines simply show less. / Jede Rechner-Kachel zeigt aus `/summary` der Gegenseite (ab Hostwerk 3.0): bereites Update, eigene letzte Sicherung (lokal/extern, mit Hinweis bei Fehler) und die Gesundheits-Punktzahl.

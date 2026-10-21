@@ -10,6 +10,7 @@ Several machines as one network: pair laptop, home and rented servers, operate t
 
 ## What it does
 
+- **Where:** System → Computers – no own sidebar entry since 1.2.1; the full page stays under Extensions → Open
 - Pair other Hostwerk installations with a code – the certificate is pinned, the key stored encrypted
 - Switch the whole interface to another machine in the title bar
 - Every machine at a glance: load, memory, disk, services, players, problems, last backup – from Hostwerk 3.0 also a ready update, the machine's own last backup and its health score

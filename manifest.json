@@ -9,7 +9,7 @@
     "de": "Mehrere Rechner als ein Verbund: Laptop, Heim- und Mietserver koppeln, von hier bedienen und alle mit Auslastung, Diensten und Sicherungen auf einen Blick sehen. Mit Linux-Server-Einrichtung per SSH, Rechner-Wechsel in der Titelleiste und nächtlicher Sicherung auf diesen PC.",
     "en": "Several machines as one network: pair laptop, home and rented servers, operate them from here and see all of them with load, services and backups at a glance. With Linux server setup over SSH, a machine switch in the title bar and a nightly backup to this PC."
   },
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Hostwerk",
   "homepage": "https://github.com/Passimoritz/hostwerk-ext-hostwerk-network",
   "license": "MIT",
@@ -31,9 +31,7 @@
       "en": "Pair and operate more PCs and servers."
     },
     "icon": "network",
-    "nav": {
-      "group": "system"
-    }
+    "nav": false
   },
   "backend": "server/index.js",
   "ui": "ui/index.js",
