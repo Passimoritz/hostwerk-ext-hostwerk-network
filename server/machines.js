@@ -11,9 +11,11 @@
  * only then does the key go over the line (so even self-issued certificates are safe). The key is stored encrypted.
  * Data stays where it always was: settings.machines.
  */
+const fs = require('fs');
 const tls = require('tls');
 const https = require('https');
 const crypto = require('crypto');
+const { pipeline } = require('stream');
 // Hostwerk's helpers – bound at start (bindCore)
 let secrets = null;
 let WebSocketLib = null;
@@ -88,6 +90,76 @@ class Machines {
       req.on('error', reject);
       req.on('timeout', () => req.destroy(new Error(T('Timeout during the transfer'))));
       if (data) req.write(data);
+      req.end();
+    });
+  }
+
+  /** Fehlerantwort der Gegenseite → Error (401 = Schlüssel abgelehnt). */
+  static httpError(status, buf) {
+    let j = null; try { j = JSON.parse(buf.toString('utf8')); } catch { /* no JSON */ }
+    return new Error(status === 401 ? T('The other machine refuses the key – please pair again.') : (j && j.error) || `HTTP ${status}`);
+  }
+
+  /**
+   * Send a file to a paired machine as a stream – nothing is held in memory, also for packages of many GB (Hostwerk's
+   * "move" uses it: transfer.remoteUpload). source = file path (with content-length) or a readable stream (chunked).
+   * Answer as JSON (or null). Same protection as raw(): certificate fingerprint first, then the key.
+   */
+  async rawFile(mid, method, p, source, { timeout = 3600000, type = 'application/octet-stream' } = {}) {
+    const m = this.get(mid);
+    const isPath = typeof source === 'string';
+    const size = isPath ? fs.statSync(source).size : null;
+    const sock = await pinnedSocket(m.url, m.fp);
+    const u = new URL(m.url);
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const fail = (e) => { if (!done) { done = true; reject(e); } };
+      const req = https.request({ host: u.hostname, port: Number(u.port) || 443, method, path: `/api${p}`, createConnection: () => sock, timeout,
+        headers: { 'x-hostwerk-key': secrets.open(m.key), accept: 'application/json', 'content-type': type, ...(size != null ? { 'content-length': size } : { 'transfer-encoding': 'chunked' }) } }, (res) => {
+        const chunks = [];
+        res.on('data', (c) => { if (chunks.length < 4096) chunks.push(c); }); // Antworten sind klein (JSON) – nie unbegrenzt sammeln
+        res.on('end', () => {
+          if (done) return;
+          const buf = Buffer.concat(chunks);
+          if (res.statusCode >= 400) return fail(Machines.httpError(res.statusCode, buf));
+          done = true;
+          try { resolve(JSON.parse(buf.toString('utf8'))); } catch { resolve(null); }
+        });
+        res.on('error', fail);
+      });
+      req.on('error', fail);
+      req.on('timeout', () => req.destroy(new Error(T('Timeout during the transfer'))));
+      const input = isPath ? fs.createReadStream(source) : source;
+      pipeline(input, req, (e) => { if (e) { req.destroy(); fail(e); } });
+    });
+  }
+
+  /**
+   * Fetch a file from a paired machine straight into dest (streamed, written to dest.part and renamed when complete –
+   * a broken transfer never leaves a half file under the real name). Resolves to the number of bytes.
+   */
+  async download(mid, p, dest, { timeout = 3600000 } = {}) {
+    const m = this.get(mid);
+    const sock = await pinnedSocket(m.url, m.fp);
+    const u = new URL(m.url);
+    const part = `${dest}.part`;
+    return new Promise((resolve, reject) => {
+      const req = https.request({ host: u.hostname, port: Number(u.port) || 443, method: 'GET', path: `/api${p}`, createConnection: () => sock, timeout, headers: { 'x-hostwerk-key': secrets.open(m.key), accept: '*/*' } }, (res) => {
+        if (res.statusCode >= 400) {
+          const chunks = [];
+          res.on('data', (c) => { if (chunks.length < 64) chunks.push(c); });
+          res.on('end', () => reject(Machines.httpError(res.statusCode, Buffer.concat(chunks))));
+          return;
+        }
+        let bytes = 0;
+        res.on('data', (c) => { bytes += c.length; });
+        pipeline(res, fs.createWriteStream(part), (e) => {
+          if (e) { fs.rm(part, { force: true }, () => reject(e)); return; }
+          fs.rename(part, dest, (e2) => (e2 ? reject(e2) : resolve(bytes)));
+        });
+      });
+      req.on('error', (e) => { fs.rm(part, { force: true }, () => reject(e)); });
+      req.on('timeout', () => req.destroy(new Error(T('Timeout during the transfer'))));
       req.end();
     });
   }
