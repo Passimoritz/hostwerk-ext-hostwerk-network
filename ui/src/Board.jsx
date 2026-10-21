@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Monitor, Server, Cpu, MemoryStick, HardDrive, Users, AlertTriangle, CheckCircle2, XCircle, History, SquareTerminal, ArrowRightLeft, RefreshCw, Laptop } from 'lucide-react';
 import { useApi, setMachine, currentMachine, fmtBytes } from '@hostwerk/api';
-import { Btn, Loading } from '@hostwerk/ui';
+import { Btn, Loading, Empty } from '@hostwerk/ui';
 import { t } from '@hostwerk/i18n';
 import ServerBackups from './Backups';
 
@@ -42,7 +42,7 @@ function Tile({ m, onBackups, compact }) {
     <div className={`mb-tile ${!m.online ? 'off' : bad ? 'bad' : ''}`}>
       <div className="mb-head">
         <span className="mb-ico">{isLocal ? <Laptop size={16} /> : <Server size={16} />}</span>
-        <div className="grow" style={{ minWidth: 0 }}>
+        <div className="grow hn-min0">
           <b className="ellipsis">{m.name}</b>
           <div className="tiny muted ellipsis">{m.online ? `${m.host || ''}${m.version ? ` · Hostwerk ${m.version}` : ''}` : m.error || t('not reachable')}</div>
         </div>
@@ -83,7 +83,13 @@ function Tile({ m, onBackups, compact }) {
 export default function MachinesBoard({ compact = false }) {
   // Offline machines answer only after 8 s – no reload on every live event (that would throw away each slow answer); own 30 s cycle below
   const o = useApi('/machines/overview', [], { live: false, poll: false });
-  useEffect(() => { const x = setInterval(() => o.reload({ silent: true }), 30000); return () => clearInterval(x); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Versteckter Reiter/minimiertes Fenster: nicht fragen – beim Zurückkommen sofort nachholen
+  useEffect(() => {
+    const x = setInterval(() => { if (!document.hidden) o.reload({ silent: true }); }, 30000);
+    const back = () => { if (!document.hidden) o.reload({ silent: true }); };
+    document.addEventListener('visibilitychange', back);
+    return () => { clearInterval(x); document.removeEventListener('visibilitychange', back); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [backups, setBackups] = useState(null);
   const list = Array.isArray(o.data) ? o.data : null;
   // On the dashboard the tile only shows up once another machine is paired
@@ -96,12 +102,12 @@ export default function MachinesBoard({ compact = false }) {
         <div className="right row-tight">{!compact && <button className="btn ghost sm icon" title="Reload" aria-label={t('Reload')} onClick={o.reload}><RefreshCw /></button>}{compact && <a className="btn sm" href="#/ext/hostwerk-network">Manage</a>}</div>
       </div>
       <div className="card-body">
-        {!list ? <Loading text="Asking the machines …" /> : (
+        {!list && o.error ? <Empty icon={AlertTriangle} title="The machines could not be asked" text={o.error} action={<Btn icon={RefreshCw} onClick={() => o.reload()}>Try again</Btn>} /> : !list ? <Loading text="Asking the machines …" /> : (
           <div className={`mb-grid ${compact ? 'compact' : ''}`}>
             {list.map((m) => <Tile key={m.id} m={m} compact={compact} onBackups={setBackups} />)}
           </div>
         )}
-        {list && list.length === 1 && !compact && <div className="small muted" style={{ marginTop: 10 }}>No other machine paired yet – use “Add machine” below or set up a server with one click.</div>}
+        {list && list.length === 1 && !compact && <div className="small muted hn-mt-3">No other machine paired yet – use “Add machine” below or set up a server with one click.</div>}
       </div>
       {backups && <ServerBackups machine={backups} onClose={() => setBackups(null)} />}
     </div>

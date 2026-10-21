@@ -16,6 +16,12 @@ Several machines as one network: pair laptop, home and rented servers, operate t
 - Own server with one click: sets up Hostwerk on a Linux server over SSH (Node.js, service, remote access with two-factor, firewall, optional domain with Let’s Encrypt)
 - Nightly backup of a server to this PC and restore of single projects, databases and Minecraft servers
 - Share this PC with others (keys you can revoke)
+- **Outage alerts:** if a machine stops answering (two checks in a row, every 2 minutes), Hostwerk says so – in the interface and as a push message on the phone – and again when it is back
+- **Version check:** machines with an older or newer Hostwerk are marked; **update Hostwerk there** with one click (desktop app – a server set up over SSH uses “Update server”)
+- **Move from this machine …** right in the machine’s right-click menu (Hostwerk’s move dialog with the source already chosen)
+- Streams move packages in both directions (`rawFile`, `download`) – nothing of many GB is held in memory
+- Loading errors with *Try again*, no polling while hidden, colours from Hostwerk’s accent
+- Other extensions may add tabs to its page (`allowExtensions`)
 
 ## Install
 

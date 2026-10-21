@@ -101,3 +101,30 @@ test('certificate pin: a server with another certificate is refused', async (t) 
 test('every German text has a value', () => {
   for (const [k, v] of Object.entries(de)) if (k !== '$patterns') assert.ok(typeof v === 'string' && v.trim(), k);
 });
+
+test('versions are compared; an older machine is marked', () => {
+  const { cmpVersion } = require('../server/machines');
+  assert.strictEqual(cmpVersion('2.11.0', '2.12.1'), -1); assert.strictEqual(cmpVersion('2.12.1', '2.12.1'), 0); assert.strictEqual(cmpVersion('3.0.0', '2.99.9'), 1);
+  assert.strictEqual(cmpVersion(null, '2.1.0'), 0); assert.strictEqual(cmpVersion('x', '2.1.0'), 0);
+  const h = fakeHost(); const m = new Machines(h);
+  m.localVersion = '2.12.0';
+  h.S.machines = [{ id: 'a1b2c3d4e5', name: 'Server', url: 'https://10.0.0.2:8443', key: 'k', fp: 'AA' }];
+  m.reach.set('a1b2c3d4e5', { online: true, version: '2.10.3', at: 1 });
+  assert.strictEqual(m.pub(h.S.machines[0]).versionDiff, 'older');
+  m.reach.set('a1b2c3d4e5', { online: true, version: '2.12.0', at: 1 });
+  assert.strictEqual(m.pub(h.S.machines[0]).versionDiff, null);
+});
+
+test('outage watch: reported after two failed checks, and again when it is back', () => {
+  const h = fakeHost(); const m = new Machines(h);
+  h.S.machines = [{ id: 'a1b2c3d4e5', name: 'Server', url: 'https://10.0.0.2:8443', key: 'k', fp: 'AA' }];
+  m.reach.set('a1b2c3d4e5', { online: false, error: 'timeout' });
+  assert.deepStrictEqual(m.transitions(1000), [], 'one hiccup is not an outage');
+  const e = m.transitions(2000);
+  assert.deepStrictEqual(e.map((x) => x.type), ['down']);
+  assert.strictEqual(m.pub(h.S.machines[0]).downSince, 1000);
+  assert.deepStrictEqual(m.transitions(3000), [], 'reported once');
+  m.reach.set('a1b2c3d4e5', { online: true, version: '2.12.0' });
+  assert.deepStrictEqual(m.transitions(4000).map((x) => x.type), ['up']);
+  assert.deepStrictEqual(m.transitions(5000), []);
+});

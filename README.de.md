@@ -16,6 +16,12 @@ Mehrere Rechner als ein Verbund: Laptop, Heim- und Mietserver koppeln, von hier 
 - Eigener Server mit einem Klick: richtet Hostwerk per SSH auf einem Linux-Server ein (Node.js, Dienst, Fernzugriff mit Zwei-Faktor, Firewall, optional Domain mit Let’s Encrypt)
 - Nächtliche Sicherung eines Servers auf diesen PC und Wiederherstellen einzelner Projekte, Datenbanken und Minecraft-Server
 - Diesen PC für andere freigeben (widerrufbare Schlüssel)
+- **Ausfall-Meldung:** Antwortet ein Rechner nicht mehr (zwei Prüfungen hintereinander, alle 2 Minuten), sagt Hostwerk Bescheid – in der Oberfläche und als Push-Nachricht aufs Handy – und wieder, wenn er zurück ist
+- **Versions-Abgleich:** Rechner mit älterem oder neuerem Hostwerk sind markiert; **Hostwerk dort aktualisieren** mit einem Klick (Desktop-App – ein per SSH eingerichteter Server nimmt „Server aktualisieren“)
+- **Von diesem Rechner umziehen …** direkt im Rechtsklick-Menü des Rechners (Hostwerks Umzugs-Dialog mit schon gewählter Quelle)
+- Umzugspakete werden in beide Richtungen gestreamt (`rawFile`, `download`) – nichts von vielen GB liegt im Arbeitsspeicher
+- Ladefehler mit *Erneut versuchen*, keine Abfragen bei verstecktem Reiter, Farben aus Hostwerks Akzent
+- Andere Erweiterungen dürfen Reiter auf ihrer Seite ergänzen (`allowExtensions`)
 
 ## Installieren
 

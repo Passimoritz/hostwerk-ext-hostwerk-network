@@ -14,6 +14,9 @@ exports.activate = (host) => {
   const vps = host.provide('vps', new VpsSetup(host));
   machines.routes(host.router);
   vps.routes(host.router);
+  // Ausfall-Wächter: alle 2 Minuten fragen, Ausfälle und Wiederkehr melden
+  if (!process.env.HW_TEST) machines.startWatch();
+  host.on('shutdown', () => machines.stopWatch());
   // Live channel of a paired machine: /ws/m/<machine>[/term]
   host.on('upgrade', (req, socket, head) => {
     if (!req.url.startsWith('/ws/m/')) return false;

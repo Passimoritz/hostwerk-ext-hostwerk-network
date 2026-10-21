@@ -23,6 +23,13 @@ let T = (s, v) => (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undef
 function bindCore(host) { secrets = host.core('secrets'); WebSocketLib = host.lib('ws'); if (host.t) T = host.t; }
 
 const norm = (fp) => String(fp || '').toUpperCase().replace(/[^0-9A-F]/g, '');
+/** Versionen vergleichen („2.11.0“ < „2.12.1“): -1, 0, 1 – unbekannt = 0 (keine Warnung). */
+function cmpVersion(a, b) {
+  const pa = String(a || '').split(/[.-]/).map((x) => parseInt(x, 10)); const pb = String(b || '').split(/[.-]/).map((x) => parseInt(x, 10));
+  if (!a || !b || pa.some(isNaN) || pb.some(isNaN)) return 0;
+  for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0) ? -1 : 1; }
+  return 0;
+}
 const HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'host', 'cookie', 'origin', 'referer', 'x-hostwerk-token', 'content-length']);
 
 /** Open the TLS connection and check the certificate – only then is anything sent. */
@@ -42,9 +49,63 @@ function pinnedSocket(url, fp) {
 }
 
 class Machines {
-  constructor(host) { bindCore(host); this.ctx = host.ctx; this.reach = new Map(); }
+  constructor(host) {
+    bindCore(host); this.host = host; this.ctx = host.ctx; this.reach = new Map(); this.down = new Map();
+    // Eigene Hostwerk-Version – Gegenseiten mit anderer Version werden angezeigt (Umzug und Bedienen klappen am besten gleich)
+    this.localVersion = null;
+    try { this.localVersion = require(require('path').join(host.appRoot || '', 'package.json')).version || null; } catch { /* unbekannt */ }
+  }
   get list() { const s = this.ctx.settings.get(); s.machines = s.machines || []; return s.machines; }
-  pub(m) { const st = this.reach.get(m.id) || {}; return { id: m.id, name: m.name, url: m.url, host: new URL(m.url).host, addedAt: m.addedAt, online: st.online ?? null, version: st.version || null, checkedAt: st.at || null, error: st.error || null }; }
+  pub(m) {
+    const st = this.reach.get(m.id) || {};
+    const c = cmpVersion(st.version, this.localVersion);
+    return { id: m.id, name: m.name, url: m.url, host: new URL(m.url).host, addedAt: m.addedAt, online: st.online ?? null, version: st.version || null, localVersion: this.localVersion, versionDiff: c < 0 ? 'older' : c > 0 ? 'newer' : null, checkedAt: st.at || null, error: st.error || null, downSince: (this.down.get(m.id) || {}).since || null };
+  }
+
+  /**
+   * Ausfall-Wächter: nach jedem Rundruf (status) Übergänge melden. Erst nach zwei Fehlversuchen hintereinander „nicht
+   * erreichbar“ (ein Aussetzer im WLAN ist kein Ausfall), wieder da sofort. Liefert die Ereignisse [{ type: 'down' | 'up', m }].
+   */
+  transitions(now = Date.now()) {
+    const out = [];
+    for (const m of this.list) {
+      const st = this.reach.get(m.id); if (!st) continue;
+      const d = this.down.get(m.id) || { fails: 0, since: null, told: false };
+      if (st.online) { if (d.told) out.push({ type: 'up', m, since: d.since }); this.down.delete(m.id); continue; }
+      d.fails++; if (!d.since) d.since = now;
+      if (d.fails >= 2 && !d.told) { d.told = true; out.push({ type: 'down', m, error: st.error }); }
+      this.down.set(m.id, d);
+    }
+    return out;
+  }
+  /** Alle paar Minuten prüfen und Ausfälle melden: Meldung in der Oberfläche und aufs Handy (Push), wenn eingerichtet. */
+  async watchTick() {
+    if (!this.list.length) return [];
+    await this.status();
+    const events = this.transitions();
+    for (const e of events) {
+      const title = e.type === 'down' ? T('{name} is not reachable', { name: e.m.name }) : T('{name} is reachable again', { name: e.m.name });
+      try { this.host.broadcast({ type: 'toast', kind: e.type === 'down' ? 'error' : 'success', text: title }); } catch { /* egal */ }
+      try { if (this.ctx.push && typeof this.ctx.push.send === 'function') await this.ctx.push.send({ title, text: e.error || '', kind: e.type === 'down' ? 'error' : 'info', url: '/#/ext/hostwerk-network', event: 'machines' }); } catch { /* egal */ }
+      try { this.host.broadcast({ type: 'machines' }); } catch { /* egal */ }
+    }
+    return events;
+  }
+  startWatch(ms = 120000) { this.watchTimer = setInterval(() => this.watchTick().catch(() => {}), ms); if (this.watchTimer.unref) this.watchTimer.unref(); }
+  stopWatch() { clearInterval(this.watchTimer); }
+
+  /**
+   * Hostwerk auf der Gegenseite aktualisieren (Desktop-App mit eigenem Updater): nach Updates suchen und, wenn eins da
+   * ist, installieren. Server ohne Updater (eingerichtet per SSH) aktualisiert „Server aktualisieren“ (vps.js).
+   */
+  async remoteUpdate(mid) {
+    const st = await this.raw(mid, 'GET', '/app/update', null, { timeout: 20000 });
+    if (!st || st.supported === false) throw Object.assign(new Error(T('This machine cannot update itself – for a server set up over SSH use “Update server”.')), { status: 409, code: 'NO_UPDATER' });
+    const c = await this.raw(mid, 'POST', '/app/update/check', {}, { timeout: 60000 });
+    const version = (c && (c.version || c.latest)) || null;
+    if (c && (c.state === 'available' || c.state === 'downloaded')) { await this.raw(mid, 'POST', '/app/update/install', {}, { timeout: 30000 }); return { started: true, version }; }
+    return { started: false, upToDate: true, version };
+  }
   get(id) { const m = this.list.find((x) => x.id === id); if (!m) throw Object.assign(new Error(T('Machine not found')), { status: 404 }); return m; }
 
   /** Request to a machine (for checks and status). */
@@ -264,6 +325,7 @@ class Machines {
     r.post('/machines', async (req, res) => res.json(await this.add(req.body || {})));
     r.put('/machines/:id', (req, res) => res.json(this.rename(req.params.id, (req.body || {}).name)));
     r.delete('/machines/:id', (req, res) => { this.remove(req.params.id); res.json(this.list.map((m) => this.pub(m))); });
+    r.post('/machines/:id/update', async (req, res) => res.json(await this.remoteUpdate(req.params.id)));
     r.all('/m/:mid/*rest', (req, res) => {
       const rest = [].concat(req.params.rest || []).join('/');
       this.proxy(req, res, req.params.mid, rest).catch((e) => { if (!res.headersSent) res.status(e.status || 502).json({ error: e.message }); });
@@ -271,4 +333,4 @@ class Machines {
   }
 }
 
-module.exports = { Machines, pinnedSocket, norm };
+module.exports = { Machines, pinnedSocket, norm, cmpVersion };
