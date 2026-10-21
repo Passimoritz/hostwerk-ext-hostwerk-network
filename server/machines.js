@@ -308,19 +308,21 @@ class Machines {
 
   routes(r) {
     r.get('/machines', async (req, res) => res.json(req.query.check === '1' ? await this.status() : this.list.map((m) => this.pub(m))));
-    // Every machine at a glance: this PC + every paired one (in parallel, at most 8 s each)
+    // Every machine at a glance: this PC + every paired one (in parallel, at most 8 s each). /summary brings – from
+    // Hostwerk 3.0 on – appUpdate, lastBackup ({ local, offsite, offsiteError }) and health ({ score, at, problems });
+    // the copy of a server on this PC is "pulledBackup" (day), so it never collides with the other side's own lastBackup.
     r.get('/machines/overview', async (req, res) => {
       const backups = this.ctx.transfer ? this.ctx.transfer.backups() : [];
       const one = async (m) => {
         const bk = backups.find((b) => b.machine === m.id);
-        const lastBackup = bk && bk.days[0] ? bk.days[0].day : null;
+        const pulledBackup = bk && bk.days[0] ? bk.days[0].day : null;
         try {
           const s = await Promise.race([this.raw(m.id, 'GET', '/summary', null, { timeout: 8000 }), new Promise((_, rej) => setTimeout(() => rej(new Error(T('does not answer'))), 8000))]);
-          return { id: m.id, name: m.name, url: m.url, online: true, lastBackup, ...s };
-        } catch (e) { return { id: m.id, name: m.name, url: m.url, online: false, error: e.message, lastBackup }; }
+          return { ...summaryFields(s), id: m.id, name: m.name, url: m.url, online: true, pulledBackup };
+        } catch (e) { return { id: m.id, name: m.name, url: m.url, online: false, error: e.message, pulledBackup }; }
       };
       const local = this.ctx.summary ? await this.ctx.summary() : {};
-      res.json([{ id: 'local', name: T('This PC'), online: true, local: true, ...local }, ...(await Promise.all(this.list.map(one)))]);
+      res.json([{ ...summaryFields(local), id: 'local', name: T('This PC'), online: true, local: true }, ...(await Promise.all(this.list.map(one)))]);
     });
     r.post('/machines', async (req, res) => res.json(await this.add(req.body || {})));
     r.put('/machines/:id', (req, res) => res.json(this.rename(req.params.id, (req.body || {}).name)));
@@ -333,4 +335,19 @@ class Machines {
   }
 }
 
-module.exports = { Machines, pinnedSocket, norm, cmpVersion };
+/**
+ * /summary of a machine for its tile – unknown or broken fields (older Hostwerk) become null instead of breaking the tile:
+ * appUpdate "3.0.1" | null · lastBackup { local, offsite, offsiteError } | null · health { score 0–100, at, problems } | null
+ */
+function summaryFields(s) {
+  const o = s && typeof s === 'object' ? { ...s } : {};
+  const num = (x) => (Number.isFinite(Number(x)) && x !== null && x !== '' ? Number(x) : null);
+  o.appUpdate = typeof o.appUpdate === 'string' && /^\d+\.\d+\.\d+[\w.-]*$/.test(o.appUpdate) ? o.appUpdate : null;
+  const b = o.lastBackup && typeof o.lastBackup === 'object' ? o.lastBackup : null;
+  o.lastBackup = b ? { local: num(b.local), offsite: num(b.offsite), offsiteError: b.offsiteError ? String(b.offsiteError).slice(0, 200) : null } : null;
+  const h = o.health && typeof o.health === 'object' ? o.health : null;
+  o.health = h && num(h.score) !== null ? { score: Math.max(0, Math.min(100, Math.round(num(h.score)))), at: num(h.at), problems: Array.isArray(h.problems) ? h.problems.length : num(h.problems) || 0 } : null;
+  return o;
+}
+
+module.exports = { Machines, pinnedSocket, norm, cmpVersion, summaryFields };

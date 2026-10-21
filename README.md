@@ -12,7 +12,7 @@ Several machines as one network: pair laptop, home and rented servers, operate t
 
 - Pair other Hostwerk installations with a code – the certificate is pinned, the key stored encrypted
 - Switch the whole interface to another machine in the title bar
-- Every machine at a glance: load, memory, disk, services, players, problems, last backup
+- Every machine at a glance: load, memory, disk, services, players, problems, last backup – from Hostwerk 3.0 also a ready update, the machine's own last backup and its health score
 - Own server with one click: sets up Hostwerk on a Linux server over SSH (Node.js, service, remote access with two-factor, firewall, optional domain with Let’s Encrypt)
 - Nightly backup of a server to this PC and restore of single projects, databases and Minecraft servers
 - Share this PC with others (keys you can revoke)

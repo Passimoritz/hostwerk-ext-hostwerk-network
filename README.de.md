@@ -12,7 +12,7 @@ Mehrere Rechner als ein Verbund: Laptop, Heim- und Mietserver koppeln, von hier 
 
 - Andere Hostwerk-Installationen per Code koppeln – Zertifikat festgehalten, Schlüssel verschlüsselt gespeichert
 - Die ganze Oberfläche in der Titelleiste auf einen anderen Rechner umschalten
-- Alle Rechner auf einen Blick: Auslastung, Speicher, Platte, Dienste, Spieler, Probleme, letzte Sicherung
+- Alle Rechner auf einen Blick: Auslastung, Speicher, Platte, Dienste, Spieler, Probleme, letzte Sicherung – ab Hostwerk 3.0 auch ein bereites Update, die eigene letzte Sicherung des Rechners und seine Gesundheits-Punktzahl
 - Eigener Server mit einem Klick: richtet Hostwerk per SSH auf einem Linux-Server ein (Node.js, Dienst, Fernzugriff mit Zwei-Faktor, Firewall, optional Domain mit Let’s Encrypt)
 - Nächtliche Sicherung eines Servers auf diesen PC und Wiederherstellen einzelner Projekte, Datenbanken und Minecraft-Server
 - Diesen PC für andere freigeben (widerrufbare Schlüssel)

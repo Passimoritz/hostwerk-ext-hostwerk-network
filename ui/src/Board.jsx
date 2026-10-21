@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Monitor, Server, Cpu, MemoryStick, HardDrive, Users, AlertTriangle, CheckCircle2, XCircle, History, SquareTerminal, ArrowRightLeft, RefreshCw, Laptop } from 'lucide-react';
+import { Monitor, Server, Cpu, MemoryStick, HardDrive, Users, AlertTriangle, CheckCircle2, XCircle, History, SquareTerminal, ArrowRightLeft, RefreshCw, Laptop, ArrowUpCircle, HeartPulse, Archive } from 'lucide-react';
 import { useApi, setMachine, currentMachine, fmtBytes } from '@hostwerk/api';
 import { Btn, Loading, Empty } from '@hostwerk/ui';
 import { t } from '@hostwerk/i18n';
@@ -11,6 +11,14 @@ import ServerBackups from './Backups';
  */
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 const level = (p) => (p >= 90 ? 'err' : p >= 75 ? 'warn' : 'ok');
+/** Gesundheits-Punktzahl (0–100) → Stufe wie die Balken */
+const healthLevel = (score) => (score >= 80 ? 'ok' : score >= 50 ? 'warn' : 'err');
+/** Zeitstempel → „heute“, „gestern“, „vor 3 Tagen“ */
+const agoTs = (ts) => {
+  if (!ts) return null;
+  const d = Math.floor((Date.now() - ts) / 86400000);
+  return d <= 0 ? t('today') : d === 1 ? t('yesterday') : t('{n} days ago', { n: d });
+};
 const ago = (day) => {
   if (!day) return null;
   const d = Math.round((Date.now() - new Date(`${day}T03:30:00`).getTime()) / 86400000);
@@ -36,8 +44,15 @@ function Tile({ m, onBackups, compact }) {
   const sv = m.services || { running: 0, total: 0, errors: [] };
   const probs = m.problems || [];
   const bad = !m.online || (sv.errors || []).length || probs.length;
-  const backupAge = ago(m.lastBackup);
-  const staleBackup = !isLocal && m.lastBackup && (Date.now() - new Date(`${m.lastBackup}T03:30:00`).getTime()) > 2 * 86400000;
+  // Kopie des Servers auf diesem PC (Umziehen/Sichern) – bei älteren Versionen dieser Erweiterung hieß das Feld lastBackup
+  const pulled = m.pulledBackup || (typeof m.lastBackup === 'string' ? m.lastBackup : null);
+  const backupAge = ago(pulled);
+  const staleBackup = !isLocal && pulled && (Date.now() - new Date(`${pulled}T03:30:00`).getTime()) > 2 * 86400000;
+  // Aus /summary der Gegenseite (Hostwerk 3.0): eigene letzte Sicherung, Gesundheit, verfügbares Update
+  const own = m.lastBackup && typeof m.lastBackup === 'object' ? m.lastBackup : null;
+  const ownAge = own ? agoTs(Math.max(own.local || 0, own.offsite || 0)) : null;
+  const ownStale = own && Math.max(own.local || 0, own.offsite || 0) && Date.now() - Math.max(own.local || 0, own.offsite || 0) > 7 * 86400000;
+  const health = m.health && Number.isFinite(m.health.score) ? m.health : null;
   return (
     <div className={`mb-tile ${!m.online ? 'off' : bad ? 'bad' : ''}`}>
       <div className="mb-head">
@@ -58,7 +73,10 @@ function Tile({ m, onBackups, compact }) {
           <div className="mb-facts small">
             <span>{t('{running}/{total} services', { running: sv.running, total: sv.total })}</span>
             {m.players > 0 && <span><Users size={11} /> {t('{n} players', { n: m.players })}</span>}
-            {!isLocal && <span className={staleBackup ? 'c-warn' : ''}><History size={11} /> {backupAge ? t('Backup {age}', { age: backupAge }) : t('no backup')}</span>}
+            {!isLocal && <span className={staleBackup ? 'c-warn' : ''} title={t('Copy of this server on this PC')}><History size={11} /> {backupAge ? t('Backup {age}', { age: backupAge }) : t('no backup')}</span>}
+            {own && <span className={own.offsiteError || ownStale ? 'c-warn' : ''} title={own.offsiteError ? t('External backup failed: {error}', { error: own.offsiteError }) : t('Last backup there (local or external)')}><Archive size={11} /> {ownAge ? t('Saved {age}', { age: ownAge }) : t('never saved there')}</span>}
+            {health && <span className={`c-${healthLevel(health.score)}`} title={t('Health check {age}', { age: agoTs(health.at) || '–' })}><HeartPulse size={11} /> {t('Health {score}/100', { score: health.score })}</span>}
+            {m.appUpdate && <span className="c-warn"><ArrowUpCircle size={11} /> {t('Update {version} ready', { version: m.appUpdate })}</span>}
           </div>
           {!compact && ((sv.errors || []).length > 0 || probs.length > 0) && (
             <ul className="mb-problems tiny">

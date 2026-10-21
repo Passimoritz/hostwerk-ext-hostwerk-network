@@ -1,3 +1,8 @@
+## 1.2.0
+
+- Every machine tile shows what the other side's `/summary` brings from Hostwerk 3.0 on: an update that is ready, its own last backup (local or external, with a hint if the external one failed) and the health score. Older machines simply show less. / Jede Rechner-Kachel zeigt aus `/summary` der Gegenseite (ab Hostwerk 3.0): bereites Update, eigene letzte Sicherung (lokal/extern, mit Hinweis bei Fehler) und die Gesundheits-Punktzahl.
+- Fix: the copy of a server on this PC (`pulledBackup`) no longer gets overwritten by the other side's own backup field. / Korrektur: die Kopie eines Servers auf diesem PC wird nicht mehr vom Sicherungsfeld der Gegenseite überschrieben.
+
 ## 1.1.0
 
 - Streaming for moves: `rawFile()` sends files/streams, `download()` writes straight to disk (via `.part`) – Hostwerk's move uses them instead of buffers. / Streaming beim Umzug: `rawFile()` sendet Dateien/Streams, `download()` schreibt direkt auf die Platte (über `.part`) – Hostwerks Umzug nutzt sie statt Puffern.

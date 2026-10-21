@@ -128,3 +128,25 @@ test('outage watch: reported after two failed checks, and again when it is back'
   assert.deepStrictEqual(m.transitions(4000).map((x) => x.type), ['up']);
   assert.deepStrictEqual(m.transitions(5000), []);
 });
+
+test('overview: update, own backup and health from /summary of the other side; the copy on this PC stays its own field', async () => {
+  const h = fakeHost('en');
+  h.S.machines = [{ id: 'srv1', name: 'VPS', url: 'https://vps.example' }, { id: 'old1', name: 'Old', url: 'https://old.example' }, { id: 'off1', name: 'Off', url: 'https://off.example' }];
+  h.ctx.transfer = { backups: () => [{ machine: 'srv1', days: [{ day: '2026-10-20' }] }] };
+  h.ctx.summary = async () => ({ version: '3.0.0', appUpdate: null, lastBackup: { local: 1000, offsite: null, offsiteError: null }, health: { score: 92, at: 5, problems: [] } });
+  const m = new Machines(h);
+  m.raw = async (id) => {
+    if (id === 'srv1') return { version: '3.0.0', appUpdate: '3.0.1', lastBackup: { local: 2000, offsite: 3000, offsiteError: 'disk full' }, health: { score: 61.6, at: 7, problems: ['a', 'b'] } };
+    if (id === 'old1') return { version: '2.11.0', cpu: 5 }; // älteres Hostwerk: ohne die neuen Felder
+    throw new Error('offline');
+  };
+  const handlers = {};
+  m.routes(new Proxy({}, { get: (_, method) => (p, fn) => { handlers[`${method.toUpperCase()} ${p}`] = fn; } }));
+  let out; await handlers['GET /machines/overview']({ query: {} }, { json: (x) => { out = x; } });
+  const [local, srv, old, off] = out;
+  assert.deepStrictEqual([local.local, local.health.score, local.lastBackup.local], [true, 92, 1000]);
+  assert.deepStrictEqual([srv.appUpdate, srv.lastBackup, srv.health, srv.pulledBackup], ['3.0.1', { local: 2000, offsite: 3000, offsiteError: 'disk full' }, { score: 62, at: 7, problems: 2 }, '2026-10-20']);
+  assert.deepStrictEqual([old.online, old.appUpdate, old.lastBackup, old.health, old.cpu], [true, null, null, null, 5]);
+  assert.deepStrictEqual([off.online, off.pulledBackup], [false, null]);
+  for (const k of ['Update {version} ready', 'Health {score}/100', 'Saved {age}', 'never saved there']) assert.ok(de[k], k);
+});
