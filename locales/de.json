@@ -1,6 +1,6 @@
 {
   "Restore": "Wiederherstellen",
-  "Safe: projects – an existing folder is renamed first. Databases – a safety backup of the target first. Minecraft – created as its own server, the original stays.": "Sicher: Projekte – ein vorhandener Ordner wird vorher umbenannt. Datenbanken – vorher Sicherheits-Backup des Ziels. Minecraft – wird als eigener Server angelegt, das Original bleibt.",
+  "Safe: projects – an existing folder is renamed first. Databases – a safety backup of the target first. Minecraft – created as its own server, the original stays.": "Sicher: Projekte – ein vorhandener Ordner wird vorher umbenannt. Datenbanken – vorher Vorab-Sicherung des Ziels. Minecraft – wird als eigener Server angelegt, das Original bleibt.",
   "Backups": "Sicherungen",
   "Nightly backups on this PC – put back single projects, databases and Minecraft servers.": "Nächtliche Sicherungen auf diesem PC – einzelne Projekte, Datenbanken und Minecraft-Server zurückspielen.",
   "No backup yet": "Noch keine Sicherung",
