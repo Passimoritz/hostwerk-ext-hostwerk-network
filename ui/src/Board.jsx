@@ -54,7 +54,7 @@ function Tile({ m, onBackups, compact }) {
   const ownStale = own && Math.max(own.local || 0, own.offsite || 0) && Date.now() - Math.max(own.local || 0, own.offsite || 0) > 7 * 86400000;
   const health = m.health && Number.isFinite(m.health.score) ? m.health : null;
   return (
-    <div className={`mb-tile ${!m.online ? 'off' : bad ? 'bad' : ''}`}>
+    <div className={`card mb-tile ${!m.online ? 'off' : bad ? 'bad' : ''}`}>
       <div className="mb-head">
         <span className="mb-ico">{isLocal ? <Laptop size={16} /> : <Server size={16} />}</span>
         <div className="grow hn-min0">

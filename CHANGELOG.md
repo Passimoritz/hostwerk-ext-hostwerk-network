@@ -1,3 +1,7 @@
+## 1.2.3
+
+- Machine tiles use Hostwerk’s own card; “Computers & servers” and “Share this PC” stand side by side, own server in one line; empty machine list as Hostwerk’s empty tile / Rechner-Kacheln nutzen Hostwerks eigene Karte; „Computer & Server“ und „Diesen PC freigeben“ stehen nebeneinander, eigener Server in einer Zeile; leere Rechnerliste als Hostwerks Leer-Kachel
+
 ## 1.2.2
 
 - German texts use Hostwerk’s words (“Vorab-Sicherung” instead of “Sicherheits-Backup”). / Deutsche Texte mit Hostwerks Wörtern („Vorab-Sicherung“ statt „Sicherheits-Backup“).

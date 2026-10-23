@@ -9,7 +9,8 @@
 /* Every machine at a glance */
 .mb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sp-8) * 8), 1fr)); gap: var(--sp-3); }
 .mb-grid.compact { grid-template-columns: repeat(auto-fill, minmax(calc(var(--sp-8) * 6.5), 1fr)); gap: var(--sp-2); }
-.mb-tile { border: 1px solid var(--line); border-radius: var(--r-xl); padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-3); background: var(--surface); min-width: 0; }
+/* Rand, Fläche und Rundung von Hostwerks .card – hier nur Aufbau und Zustände */
+.mb-tile { padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
 .mb-tile.bad { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
 .mb-tile.off { opacity: .75; border-style: dashed; }
 .mb-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
@@ -31,6 +32,7 @@
 
 /* Hilfsklassen statt Inline-Größen */
 .hn-min0 { min-width: 0; }
+.hn-cols { align-items: start; }
 .hn-wrap { flex-wrap: wrap; }
 .hn-auto { width: auto; }
 .hn-gap-1 { gap: var(--sp-1); }

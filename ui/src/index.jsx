@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Monitor, Server, Plus, Trash2, Pencil, Link2, KeyRound, Copy, RefreshCw, ArrowRightLeft, CheckCircle2, XCircle, Laptop, Cloud, SquareTerminal, History, Smartphone, Network, ArrowUpCircle, AlertTriangle, Truck } from 'lucide-react';
 import { useApi, post, put, del, currentMachine, setMachine, useStore, waitJob } from '@hostwerk/api';
-import { Btn, Callout, Modal, Field, InfoTip, Loading, Empty, Seg, Progress, toast, confirmDialog, promptDialog } from '@hostwerk/ui';
+import { Btn, Callout, Modal, Field, InfoTip, Loading, Empty, Seg, Progress, TileEmpty, toast, confirmDialog, promptDialog } from '@hostwerk/ui';
 import { contextMenu, useNew, FavMark, favSort, favMenuItem } from '@hostwerk/kit';
 import { t } from '@hostwerk/i18n';
 import MachinesBoard from './Board';
@@ -53,12 +53,14 @@ export function MachinesTab() {
       <MachinesBoard />
       {backups && <ServerBackups machine={backups} onClose={() => setBackups(null)} />}
       {cur && <Callout kind="info" icon={ArrowRightLeft} title="You are operating another machine right now">The machine list always belongs to this PC. <button className="link-btn" onClick={() => setMachine(null)}>Back to this PC</button></Callout>}
+      {/* Rechner verwalten und „Diesen PC freigeben“ nebeneinander statt untereinander (schmal wieder untereinander) */}
+      <div className="grid grid-2 hn-cols">
       <div className="card">
         <div className="card-head"><Server size={16} /><h3>Computers & servers</h3>
           <div className="right row-tight"><button className="btn ghost sm icon" title="Check again" aria-label={t('Check again')} onClick={list.reload}><RefreshCw /></button><Btn className="sm" icon={ArrowRightLeft} onClick={() => window.dispatchEvent(new CustomEvent('hw:move', { detail: {} }))}>Move …</Btn><Btn className="sm primary" icon={Plus} onClick={() => setAdd({ code: '', name: '' })}>Add machine</Btn></div>
         </div>
         {!list.data && list.error ? <Empty icon={AlertTriangle} title="The machines could not be checked" text={list.error} action={<Btn icon={RefreshCw} onClick={() => list.reload()}>Try again</Btn>} /> : !list.data ? <Loading text="Checking the machines …" /> : list.data.length === 0 ? (
-          <div className="card-body small muted">None yet. On the other machine (laptop, home server, rented server): Extensions → Hostwerk network → “Share this PC” – then paste the code here.</div>
+          <TileEmpty icon={Server} text="None yet. On the other machine (laptop, home server, rented server): Extensions → Hostwerk network → “Share this PC” – then paste the code here." />
         ) : favSort('machine', list.data).map((m) => (
           <div key={m.id} className="list-item" onContextMenu={(e) => menu(e, m)}>
             <div className="ico"><Monitor /></div><FavMark kind="machine" id={m.id} />
@@ -99,6 +101,7 @@ export function MachinesTab() {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {add && (
@@ -143,10 +146,11 @@ function VpsCard({ onDone }) {
   const readKey = (file) => { if (!file) return; const r = new FileReader(); r.onload = () => setF((x) => ({ ...x, key: String(r.result) })); r.readAsText(file); };
   return (
     <div className="card-body stack hn-gap-3 hn-top-line">
-      <div className="row-tight"><Cloud size={15} className="muted" /><b className="small">Own server with one click</b><span className="badge">{t('Linux over SSH')}</span>
+      <div className="row-tight hn-wrap"><Cloud size={15} className="muted" /><b className="small">Own server with one click</b><span className="badge">{t('Linux over SSH')}</span>
         <InfoTip>Rented server (e.g. at Hetzner, Netcup, IONOS) or a home server with Ubuntu, Debian or Fedora: Hostwerk sets itself up there – Node.js, Hostwerk without a window as a service, remote access with two-factor, firewall – and then shows up here as a machine. Your SSH sign-in is only used for the setup and never stored.</InfoTip>
+        <span className="grow" />
+        <Btn className="sm" icon={Cloud} onClick={() => setF(emptyVps('install'))}>Set up server</Btn><Btn className="sm ghost" icon={RefreshCw} onClick={() => setF(emptyVps('update'))}>Update an existing server</Btn>
       </div>
-      <div className="row-tight"><Btn className="primary sm" icon={Cloud} onClick={() => setF(emptyVps('install'))}>Set up server</Btn><Btn className="sm" icon={RefreshCw} onClick={() => setF(emptyVps('update'))}>Update an existing server</Btn></div>
       {f && (
         <Modal title={f.mode === 'update' ? 'Update server' : 'Set up own server'} subtitle={f.mode === 'update' ? 'Puts this Hostwerk version on the server – data and pairing stay' : 'Takes 2–6 minutes depending on the server'} onClose={() => !busy && setF(null)}
           footer={<><Btn onClick={() => setF(null)} disabled={!!busy}>Cancel</Btn><Btn className="primary" icon={Cloud} busy={!!busy} disabled={!f.host.trim() || (f.auth === 'key' ? !f.key : !f.password)} onClick={start}>{f.mode === 'update' ? t('Update') : t('Set up')}</Btn></>}>
