@@ -1,0 +1,32 @@
+[
+  {
+    "id": "computer-server",
+    "lang": "de",
+    "title": "Computer & Server – der Rundgang",
+    "seconds": 17
+  },
+  {
+    "id": "computer-server-stimme",
+    "lang": "de",
+    "title": "Computer & Server – der Rundgang",
+    "seconds": 17,
+    "voice": true,
+    "of": "computer-server",
+    "section": "stimme"
+  },
+  {
+    "id": "computer-server-en",
+    "lang": "en",
+    "title": "Computers & servers – the full tour",
+    "seconds": 16
+  },
+  {
+    "id": "computer-server-stimme-en",
+    "lang": "en",
+    "title": "Computers & servers – the full tour",
+    "seconds": 16,
+    "voice": true,
+    "of": "computer-server-en",
+    "section": "stimme"
+  }
+]
