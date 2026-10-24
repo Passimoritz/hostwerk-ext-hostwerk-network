@@ -1,3 +1,7 @@
+## 1.2.4
+
+- New animated icon and banner in the common Hostwerk style (isometric block). / Neues animiertes Symbol und Banner im gemeinsamen Hostwerk-Stil (isometrischer Block).
+
 ## 1.2.3
 
 - Machine tiles use Hostwerk’s own card; “Computers & servers” and “Share this PC” stand side by side, own server in one line; empty machine list as Hostwerk’s empty tile / Rechner-Kacheln nutzen Hostwerks eigene Karte; „Computer & Server“ und „Diesen PC freigeben“ stehen nebeneinander, eigener Server in einer Zeile; leere Rechnerliste als Hostwerks Leer-Kachel
