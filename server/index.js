@@ -11,6 +11,9 @@ const { VpsSetup } = require('./vps');
 
 exports.activate = (host) => {
   const machines = host.provide('machines', new Machines(host));
+  if (typeof host.contribute === 'function') host.contribute('clickguard', { block: [/^\/machines(\/|$)/] }); // Klick-Test: Rechner koppeln wirkt außerhalb des Test-Ordners
+  // Seite für „andere Rechner“: Hostwerk verlinkt darüber (Gesundheits-Check, Terminal, Projekte …), ohne uns zu kennen
+  machines.href = '#/server';
   const vps = host.provide('vps', new VpsSetup(host));
   machines.routes(host.router);
   vps.routes(host.router);

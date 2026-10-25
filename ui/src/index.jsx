@@ -4,6 +4,7 @@ import { useApi, post, put, del, currentMachine, setMachine, useStore, waitJob }
 import { Btn, Callout, Modal, Field, InfoTip, Loading, Empty, Seg, Progress, TileEmpty, toast, confirmDialog, promptDialog } from '@hostwerk/ui';
 import { contextMenu, useNew, FavMark, favSort, favMenuItem } from '@hostwerk/kit';
 import { t } from '@hostwerk/i18n';
+import { openNew } from '@hostwerk/kit';
 import MachinesBoard from './Board';
 import ServerBackups from './Backups';
 import { AddonTabs } from './addons';
@@ -234,5 +235,10 @@ export default {
   slots: {
     titlebar: [{ id: 'machine-switch', title: 'Switch machine', Component: MachineSwitch, order: 10 }],
     'machines.board': [{ id: 'board', title: 'Every machine at a glance', Component: () => <MachinesBoard compact />, order: 10 }],
+    // Hostwerks Menü „Neu“ → Abschnitt „Verbinden“
+    'new.items': [
+      { id: 'pair', section: 'verbinden', title: 'Pair a computer', hint: 'Control another PC or server from here', icon: Monitor, color: '#475569', keys: 'rechner koppeln pc server verbinden', href: '/server' },
+      { id: 'vps', section: 'verbinden', title: 'Own server (VPS)', hint: 'Set up a rented server via SSH with one click', icon: Cloud, color: '#0284c7', keys: 'vps hetzner ssh mietserver linux', onClick: () => openNew('vps', '/server') },
+    ],
   },
 };

@@ -31,7 +31,8 @@
       "en": "Pair and operate more PCs and servers."
     },
     "icon": "network",
-    "nav": false
+    "nav": false,
+    "route": "server"
   },
   "backend": "server/index.js",
   "ui": "ui/index.js",
@@ -43,6 +44,11 @@
   "allowExtensions": {
     "*": [
       "tabs"
+    ]
+  },
+  "data": {
+    "settings": [
+      "machines"
     ]
   }
 }
