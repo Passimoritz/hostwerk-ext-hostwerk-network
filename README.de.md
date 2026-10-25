@@ -4,7 +4,7 @@
 
 Mehrere Rechner als ein Verbund: Laptop, Heim- und Mietserver koppeln, von hier bedienen und alle auf einen Blick sehen.
 
-[English](README.md) · Offizielle [Hostwerk](https://github.com/Passimoritz/hostwerk-public)-Erweiterung (SDK 2.7, native Erweiterung)
+[English](README.md) · Offizielle [Hostwerk](https://github.com/Passimoritz/hostwerk-public)-Erweiterung (native Erweiterung, ab Hostwerk 2.9)
 
 ![Bildschirmfoto](docs/screenshot.de.png)
 

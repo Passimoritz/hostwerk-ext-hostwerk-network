@@ -4,7 +4,7 @@
 
 Several machines as one network: pair laptop, home and rented servers, operate them from here and see all of them at a glance.
 
-[Deutsch](README.de.md) · An official [Hostwerk](https://github.com/Passimoritz/hostwerk-public) extension (SDK 2.7, native extension)
+[Deutsch](README.de.md) · An official [Hostwerk](https://github.com/Passimoritz/hostwerk-public) extension (native extension, Hostwerk 2.9 or newer)
 
 ![Screenshot](docs/screenshot.png)
 
