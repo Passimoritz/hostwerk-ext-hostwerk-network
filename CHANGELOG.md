@@ -1,3 +1,7 @@
+## 1.2.5
+
+- “Set up remote access” leads to the new place Go live → Access → Remote access (Hostwerk with SDK 3.11). / „Fernzugriff einrichten“ führt zum neuen Ort Livebetrieb → Zugriff → Fernzugriff (Hostwerk mit SDK 3.11).
+
 ## 1.2.4
 
 - New animated icon and banner in the common Hostwerk style (isometric block). / Neues animiertes Symbol und Banner im gemeinsamen Hostwerk-Stil (isometrischer Block).

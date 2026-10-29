@@ -87,7 +87,7 @@ export function MachinesTab() {
         </div>
         <div className="card-body stack hn-gap-3">
           {remote.data && !remote.data.running ? (
-            <Callout kind="warn">This needs remote access to be running (password and two-factor). <a href="#/live/fernzugriff">Set up remote access →</a></Callout>
+            <Callout kind="warn">This needs remote access to be running (password and two-factor). <a href="#/live/zugriff/fernzugriff">Set up remote access →</a></Callout>
           ) : <div><Btn className="primary sm" icon={KeyRound} onClick={share}>Share this PC</Btn></div>}
           {keys.data && keys.data.length > 0 && (
             <div className="stack hn-gap-1">
