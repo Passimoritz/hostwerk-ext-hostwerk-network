@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Several machines: operate other Hostwerk installations (laptop, home server, rented server) from this interface.
- * Pairing uses a code from the other machine (Go live → Remote access → "Pair this machine"): addresses, pairing key,
+ * Pairing uses a code from the other machine (Go live → Access → Remote access → "Pair this machine"): addresses, pairing key,
  * certificate fingerprint.
  *
  *   /api/m/<machine>/…   requests of the interface → to the other machine (remote access, HTTPS)

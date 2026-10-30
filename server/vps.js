@@ -228,7 +228,7 @@ class VpsSetup {
             job.progress(94, T('Getting an HTTPS certificate for {domain} …', { domain: opts.domain }));
             domain = await this.setupDomain(machine.id, opts, job);
             machine = domain.machine; url = domain.url;
-          } catch (e) { job.log(T('Domain/certificate: {msg} – the server stays reachable at {url}; do it later under Go live → Remote access.', { msg: e.message, url })); domain = { error: e.message }; }
+          } catch (e) { job.log(T('Domain/certificate: {msg} – the server stays reachable at {url}; do it later under Go live → Access → Remote access.', { msg: e.message, url })); domain = { error: e.message }; }
         }
         // Automatic backup of the server to this PC (task, daily)
         let backup = null;

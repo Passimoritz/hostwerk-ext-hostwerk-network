@@ -223,7 +223,7 @@ function NetworkPage({ ext }) {
       </div>
       <InfoTip title="How it works">
         Install Hostwerk on the other machine (Windows or Linux; a rented server works with “Own server with one click”), switch on remote access there and enter the pairing code here. Then switch between the devices in the machine bar at the top – services, files, terminal and AI then run on the chosen machine.
-        <span className="small muted hn-block"><Cloud size={12} /> {t('Linux servers in a data centre')} · <Monitor size={12} /> {t('Windows or Linux PCs at home')} · <Smartphone size={12} /> {t('Phone: under Go live → Remote access')}</span>
+        <span className="small muted hn-block"><Cloud size={12} /> {t('Linux servers in a data centre')} · <Monitor size={12} /> {t('Windows or Linux PCs at home')} · <Smartphone size={12} /> {t('Phone: under Go live → Access → Remote access')}</span>
       </InfoTip>
       <AddonTabs ext={ext}><MachinesTab /></AddonTabs>
     </div>
