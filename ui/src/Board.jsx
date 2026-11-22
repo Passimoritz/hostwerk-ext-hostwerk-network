@@ -58,8 +58,8 @@ function Tile({ m, onBackups, compact }) {
       <div className="mb-head">
         <span className="mb-ico">{isLocal ? <Laptop size={16} /> : <Server size={16} />}</span>
         <div className="grow hn-min0">
-          <b className="ellipsis">{m.name}</b>
-          <div className="tiny muted ellipsis">{m.online ? `${m.host || ''}${m.version ? ` · Hostwerk ${m.version}` : ''}` : m.error || t('not reachable')}</div>
+          <b className="ellipsis" title={m.name}>{m.name}</b>
+          <div className="tiny muted ellipsis" title={m.online ? undefined : m.error || undefined}>{m.online ? `${m.host || ''}${m.version ? ` · Hostwerk ${m.version}` : ''}` : m.error || t('not reachable')}</div>
         </div>
         {m.online ? (bad ? <AlertTriangle size={16} className="c-warn" aria-label={t('Needs attention')} /> : <CheckCircle2 size={16} className="c-ok" aria-label={t('All fine')} />) : <XCircle size={16} className="c-err" aria-label={t('not reachable')} />}
       </div>
@@ -74,7 +74,7 @@ function Tile({ m, onBackups, compact }) {
             <span>{t('{running}/{total} services', { running: sv.running, total: sv.total })}</span>
             {m.players > 0 && <span><Users size={11} /> {t('{n} players', { n: m.players })}</span>}
             {!isLocal && <span className={staleBackup ? 'c-warn' : ''} title={t('Copy of this server on this PC')}><History size={11} /> {backupAge ? t('Backup {age}', { age: backupAge }) : t('no backup')}</span>}
-            {own && <span className={own.offsiteError || ownStale ? 'c-warn' : ''} title={own.offsiteError ? t('External backup failed: {error}', { error: own.offsiteError }) : t('Last backup there (local or external)')}><Archive size={11} /> {ownAge ? t('Saved {age}', { age: ownAge }) : t('never saved there')}</span>}
+            {own && <span className={own.offsiteError || ownStale ? 'c-warn' : ''} title={own.offsiteError ? t('External backup failed: {error}', { error: own.offsiteError }) : isLocal ? t('Last backup of this PC (local or external)') : t('Last backup there (local or external)')}><Archive size={11} /> {ownAge ? t('Saved {age}', { age: ownAge }) : isLocal ? t('never saved') : t('never saved there')}</span>}
             {health && <span className={`c-${healthLevel(health.score)}`} title={t('Health check {age}', { age: agoTs(health.at) || '–' })}><HeartPulse size={11} /> {t('Health {score}/100', { score: health.score })}</span>}
             {m.appUpdate && <span className="c-warn"><ArrowUpCircle size={11} /> {t('Update {version} ready', { version: m.appUpdate })}</span>}
           </div>
@@ -105,8 +105,9 @@ export default function MachinesBoard({ compact = false }) {
   useEffect(() => {
     const x = setInterval(() => { if (!document.hidden) o.reload({ silent: true }); }, 30000);
     const back = () => { if (!document.hidden) o.reload({ silent: true }); };
-    document.addEventListener('visibilitychange', back);
-    return () => { clearInterval(x); document.removeEventListener('visibilitychange', back); };
+    const changed = () => o.reload({ silent: true });
+    document.addEventListener('visibilitychange', back); window.addEventListener('hn:machines', changed);
+    return () => { clearInterval(x); document.removeEventListener('visibilitychange', back); window.removeEventListener('hn:machines', changed); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [backups, setBackups] = useState(null);
   const list = Array.isArray(o.data) ? o.data : null;

@@ -34,7 +34,7 @@ export default function ServerBackups({ machine, onClose }) {
   };
   return (
     <Modal title={entry ? t('Backups of {name}', { name: entry.name }) : t('Backups')} subtitle="Nightly backups on this PC – put back single projects, databases and Minecraft servers." size="wide" onClose={onClose}>
-      {!entry ? <Empty icon={History} title="No backup yet" text="When you set up a server (or under Tasks → “Back up server”) Hostwerk puts a backup on this PC every night." /> : (
+      {!entry || !cur ? <Empty icon={History} title="No backup yet" text="When you set up a server (or under Tasks → “Back up server”) Hostwerk puts a backup on this PC every night." /> : (
         <div className="stack hn-gap-4">
           <div className="row hn-gap-3 hn-wrap">
             <select className="select sm hn-auto" aria-label={t('Day')} value={cur.day} onChange={(e) => setDay(e.target.value)}>

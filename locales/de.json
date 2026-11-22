@@ -141,7 +141,6 @@
   "Machine not found": "Rechner nicht gefunden",
   "The other machine refuses the key (revoked or remote access off) – please pair again.": "Der andere Rechner lehnt den Schlüssel ab (widerrufen oder Fernzugriff aus) – bitte neu koppeln.",
   "Timeout": "Zeitüberschreitung",
-  "The other machine refuses the key – please pair again.": "Der andere Rechner lehnt den Schlüssel ab – bitte neu koppeln.",
   "Timeout during the transfer": "Zeitüberschreitung bei der Übertragung",
   "The pairing code is invalid – please copy all of it.": "Der Kopplungscode ist ungültig – bitte vollständig kopieren.",
   "The pairing code is invalid.": "Der Kopplungscode ist ungültig.",
@@ -211,5 +210,12 @@
   "newer version ({v})": "neuere Version ({v})",
   "{name} is not reachable": "{name} ist nicht erreichbar",
   "{name} is reachable again": "{name} ist wieder erreichbar",
-  "This machine cannot update itself – for a server set up over SSH use “Update server”.": "Dieser Rechner kann sich nicht selbst aktualisieren – bei einem per SSH eingerichteten Server „Server aktualisieren“ nehmen."
+  "This machine cannot update itself – for a server set up over SSH use “Update server”.": "Dieser Rechner kann sich nicht selbst aktualisieren – bei einem per SSH eingerichteten Server „Server aktualisieren“ nehmen.",
+  "Last backup of this PC (local or external)": "Letzte Sicherung dieses PCs (lokal oder extern)",
+  "never saved": "noch nie gesichert",
+  "Pair again": "Neu koppeln",
+  "Get a new pairing code on the other machine and paste it here": "Auf dem anderen Rechner einen neuen Kopplungscode holen und hier einfügen",
+  "not checked yet": "noch nicht geprüft",
+  "{name} (not reachable)": "{name} (nicht erreichbar)",
+  "The other machine stopped the upload early ({code}) – its reason did not arrive. Check free space and size limits there.": "Der andere Rechner hat das Hochladen vorzeitig abgebrochen ({code}) – sein Grund kam nicht an. Prüfe dort freien Speicher und Größengrenzen."
 }

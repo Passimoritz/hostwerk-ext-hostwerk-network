@@ -19,6 +19,8 @@ const openTerminal = (id, cur) => { location.hash = '/terminal'; if (cur !== id)
 const locale = () => (document.documentElement.lang === 'en' ? 'en-US' : document.documentElement.lang || 'de-DE');
 const when = (ts) => new Date(ts).toLocaleString(locale(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 /** Dinge von diesem Rechner woanders hin umziehen – Hostwerks Umzugs-Dialog, Quelle schon gewählt */
+/** Liste geändert (Koppeln, Umbenennen, Entfernen) → Übersicht oben sofort neu laden statt erst nach 30 s */
+const changed = () => window.dispatchEvent(new Event('hn:machines'));
 const moveFrom = (id) => window.dispatchEvent(new CustomEvent('hw:move', { detail: { from: id } }));
 /** Hostwerk auf der Gegenseite aktualisieren (Desktop-App mit eigenem Updater) */
 async function updateThere(m, reload) {
@@ -46,9 +48,9 @@ export function MachinesTab() {
     if (name === null) return;
     try { const r = await post('/live/remote/keys', { name }); setCode(r.code); keys.setData(r.keys); } catch (e) { toast.error(e.message); }
   };
-  const rename = async (m) => { const n = await promptDialog({ title: 'Rename machine', label: 'Name', value: m.name }); if (n) { await put(`/machines/${m.id}`, { name: n }); list.reload(); } };
-  const menu = (e, m) => contextMenu(e, [favMenuItem('machine', m.id), { label: t('Operate'), icon: ArrowRightLeft, disabled: m.online === false || cur === m.id, onClick: () => setMachine(m.id) }, { label: t('Terminal'), icon: SquareTerminal, onClick: () => openTerminal(m.id, cur) }, { label: t('Move from this machine …'), icon: Truck, disabled: m.online === false, onClick: () => moveFrom(m.id) }, { label: t('Update Hostwerk there'), icon: ArrowUpCircle, disabled: m.online === false, onClick: () => updateThere(m, list.reload) }, { label: t('Backups'), icon: History, onClick: () => setBackups(m) }, { label: t('Rename'), icon: Pencil, onClick: () => rename(m) }, { label: t('Remove'), icon: Trash2, danger: true, onClick: () => remove(m) }]);
-  const remove = async (m) => { if (await confirmDialog({ title: t('Remove “{name}”?', { name: m.name }), text: 'The pairing is deleted. Everything stays as it is on the other machine – you can also revoke the key there.', confirm: 'Remove', danger: true })) list.setData(await del(`/machines/${m.id}`)); };
+  const rename = async (m) => { const n = await promptDialog({ title: 'Rename machine', label: 'Name', value: m.name }); if (n && n.trim() && n.trim() !== m.name) { try { await put(`/machines/${m.id}`, { name: n.trim() }); list.reload(); changed(); } catch (e) { toast.error(e.message); } } };
+  const menu = (e, m) => contextMenu(e, [favMenuItem('machine', m.id), { label: t('Operate'), icon: ArrowRightLeft, disabled: m.online === false || cur === m.id, onClick: () => setMachine(m.id) }, { label: t('Terminal'), icon: SquareTerminal, disabled: m.online === false, onClick: () => openTerminal(m.id, cur) }, { label: t('Move from this machine …'), icon: Truck, disabled: m.online === false, onClick: () => moveFrom(m.id) }, { label: t('Update Hostwerk there'), icon: ArrowUpCircle, disabled: m.online === false, onClick: () => updateThere(m, list.reload) }, { label: t('Backups'), icon: History, onClick: () => setBackups(m) }, { label: t('Rename'), icon: Pencil, onClick: () => rename(m) }, { label: t('Remove'), icon: Trash2, danger: true, onClick: () => remove(m) }]);
+  const remove = async (m) => { if (await confirmDialog({ title: t('Remove “{name}”?', { name: m.name }), text: 'The pairing is deleted. Everything stays as it is on the other machine – you can also revoke the key there.', confirm: 'Remove', danger: true })) { try { list.setData(await del(`/machines/${m.id}`)); changed(); } catch (e) { toast.error(e.message); } } };
   return (
     <div className="stack">
       <MachinesBoard />
@@ -63,19 +65,24 @@ export function MachinesTab() {
         {!list.data && list.error ? <Empty icon={AlertTriangle} title="The machines could not be checked" text={list.error} action={<Btn icon={RefreshCw} onClick={() => list.reload()}>Try again</Btn>} /> : !list.data ? <Loading text="Checking the machines …" /> : list.data.length === 0 ? (
           <TileEmpty icon={Server} text="None yet. On the other machine (laptop, home server, rented server): Extensions → Hostwerk network → “Share this PC” – then paste the code here." />
         ) : favSort('machine', list.data).map((m) => (
-          <div key={m.id} className="list-item" onContextMenu={(e) => menu(e, m)}>
+          <div key={m.id} className="list-item hn-machine" onContextMenu={(e) => menu(e, m)}>
             <div className="ico"><Monitor /></div><FavMark kind="machine" id={m.id} />
             <div className="grow hn-min0">
-              <div className="row-tight hn-wrap"><b>{m.name}</b>{m.online === true ? <span className="badge ok"><CheckCircle2 size={10} /> {t('reachable')}</span> : m.online === false ? <span className="badge err"><XCircle size={10} /> {m.downSince ? t('not reachable since {when}', { when: when(m.downSince) }) : t('not reachable')}</span> : null}{cur === m.id && <span className="badge accent">{t('being operated')}</span>}
+              <div className="row-tight hn-wrap"><b className="ellipsis hn-name" title={m.name}>{m.name}</b>{m.online === true ? <span className="badge ok"><CheckCircle2 size={10} /> {t('reachable')}</span> : m.online === false ? <span className="badge err"><XCircle size={10} /> {m.downSince ? t('not reachable since {when}', { when: when(m.downSince) }) : t('not reachable')}</span> : null}{cur === m.id && <span className="badge accent">{t('being operated')}</span>}
                 {m.versionDiff && <span className={`badge ${m.versionDiff === 'older' ? 'warn' : ''}`} title={t('This PC: Hostwerk {local}', { local: m.localVersion })}>{m.versionDiff === 'older' ? t('older version ({v})', { v: m.version }) : t('newer version ({v})', { v: m.version })}</span>}</div>
-              <div className="small muted ellipsis">{m.host}{m.version ? ` · Hostwerk ${m.version}` : ''}{m.error ? ` · ${m.error}` : ''}</div>
+              <div className="small muted ellipsis" title={m.error || undefined}>{m.host}{m.version ? ` · Hostwerk ${m.version}` : ''}{m.error ? ` · ${m.error}` : ''}</div>
             </div>
+            {/* Knöpfe rutschen in schmalen Spalten in eine eigene Zeile, statt den Namen zu überdecken */}
+            <div className="hn-actions">
             <Btn className="xs ghost" icon={SquareTerminal} disabled={m.online === false} title="Terminal on this machine" onClick={() => openTerminal(m.id, cur)}>Terminal</Btn>
             {m.versionDiff === 'older' && m.online && <Btn className="xs" icon={ArrowUpCircle} title="Update Hostwerk on this machine" onClick={() => updateThere(m, list.reload)}>Update</Btn>}
             <Btn className="xs ghost" icon={History} title="Backups of this machine on this PC" onClick={() => setBackups(m)}>Backups</Btn>
+            {/* Key refused (revoked there or remote access off): the way out right here – a new code from the other machine */}
+            {m.keyRefused && <Btn className="xs" icon={Link2} title="Get a new pairing code on the other machine and paste it here" onClick={() => setAdd({ code: '', name: m.name })}>Pair again</Btn>}
             {cur !== m.id && <Btn className="xs primary" icon={ArrowRightLeft} disabled={m.online === false} onClick={() => setMachine(m.id)}>Operate</Btn>}
             <button className="btn ghost xs icon" title="Rename" aria-label={t('Rename')} onClick={() => rename(m)}><Pencil /></button>
             <Btn className="ghost xs icon" icon={Trash2} title="Remove" aria-label={t('Remove')} onClick={() => remove(m)} />
+            </div>
           </div>
         ))}
         <VpsCard onDone={list.reload} />
@@ -96,7 +103,7 @@ export function MachinesTab() {
                 <div key={k.id} className="row small">
                   <Laptop size={14} className="muted" /><span className="grow">{k.name}</span>
                   <span className="tiny muted">{k.lastUsed ? t('last used {when}', { when: when(k.lastUsed) }) : t('not used yet')}</span>
-                  <Btn className="ghost xs" onClick={async () => { if (await confirmDialog({ title: t('Revoke share “{name}”?', { name: k.name }), text: 'The other machine can no longer operate this PC afterwards.', confirm: 'Revoke', danger: true })) keys.setData(await del(`/live/remote/keys/${k.id}`)); }}>Revoke</Btn>
+                  <Btn className="ghost xs" onClick={async () => { if (await confirmDialog({ title: t('Revoke share “{name}”?', { name: k.name }), text: 'The other machine can no longer operate this PC afterwards.', confirm: 'Revoke', danger: true })) { try { keys.setData(await del(`/live/remote/keys/${k.id}`)); } catch (e) { toast.error(e.message); } } }}>Revoke</Btn>
                 </div>
               ))}
             </div>
@@ -106,7 +113,7 @@ export function MachinesTab() {
       </div>
 
       {add && (
-        <Modal title="Add machine" onClose={() => setAdd(null)} footer={<><Btn onClick={() => setAdd(null)}>Cancel</Btn><Btn className="primary" busy={busy} disabled={add.code.trim().length < 40} onClick={async () => { setBusy(true); try { await post('/machines', add); toast.success('Paired'); setAdd(null); list.reload(); } catch (e) { toast.error(e.message); } setBusy(false); }}>Pair</Btn></>}>
+        <Modal title="Add machine" onClose={() => setAdd(null)} footer={<><Btn onClick={() => setAdd(null)}>Cancel</Btn><Btn className="primary" busy={busy} disabled={add.code.trim().length < 40} onClick={async () => { setBusy(true); try { await post('/machines', add); toast.success('Paired'); setAdd(null); list.reload(); changed(); } catch (e) { toast.error(e.message); } setBusy(false); }}>Pair</Btn></>}>
           <div className="stack">
             <div className="small muted">On the other machine: Extensions → Hostwerk network → “Share this PC” and copy the code shown.</div>
             <Field label="Pairing code"><textarea className="input mono" rows={4} value={add.code} onChange={(e) => setAdd({ ...add, code: e.target.value })} /></Field>
@@ -203,12 +210,16 @@ export function MachineSwitch() {
   const cur = currentMachine();
   if (!list.data || (!list.data.length && !cur)) return null;
   const m = list.data.find((x) => x.id === cur);
+  // State before switching: a dot for the current machine, "(not reachable)" in the list, full name and state as tooltip
+  const state = (x) => (x.online === true ? t('reachable') : x.online === false ? t('not reachable') : t('not checked yet'));
+  const tip = m ? `${m.name} – ${state(m)}` : t('Switch machine');
   return (
-    <label className={`machine-switch no-drag ${cur ? 'remote' : ''}`} title="Switch machine">
+    <label className={`machine-switch no-drag ${cur ? 'remote' : ''}`} title={tip}>
       {cur ? <Server size={13} /> : <Monitor size={13} />}
+      {m && <span className={`hn-dot ${m.online === true ? 'on' : m.online === false ? 'off' : ''}`} role="img" aria-label={state(m)} />}
       <select value={cur || ''} aria-label={t('Switch machine')} onChange={(e) => setMachine(e.target.value || null)}>
         <option value="">{t('This PC')}</option>
-        {list.data.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        {list.data.map((x) => <option key={x.id} value={x.id} title={`${x.name} – ${state(x)}`}>{x.online === false ? t('{name} (not reachable)', { name: x.name }) : x.name}</option>)}
       </select>
       {cur && !m && <span className="tiny">?</span>}
     </label>

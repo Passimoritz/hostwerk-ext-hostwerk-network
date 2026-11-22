@@ -19,10 +19,14 @@ const { pipeline } = require('stream');
 // Hostwerk's helpers – bound at start (bindCore)
 let secrets = null;
 let WebSocketLib = null;
+/** Socket errors of an upload the other side cut off (it may have answered just before). */
+const UPLOAD_CUT = new Set(['ECONNABORTED', 'ECONNRESET', 'EPIPE']);
 let T = (s, v) => (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m)) : s);
 function bindCore(host) { secrets = host.core('secrets'); WebSocketLib = host.lib('ws'); if (host.t) T = host.t; }
 
 const norm = (fp) => String(fp || '').toUpperCase().replace(/[^0-9A-F]/g, '');
+/** Name eines Rechners: ohne Leerraum außen, höchstens 60 Zeichen (Emoji nicht zerschnitten) – leer = '' */
+const label = (x) => Array.from(String(x == null ? '' : x).trim()).slice(0, 60).join('').trim();
 /** Versionen vergleichen („2.11.0“ < „2.12.1“): -1, 0, 1 – unbekannt = 0 (keine Warnung). */
 function cmpVersion(a, b) {
   const pa = String(a || '').split(/[.-]/).map((x) => parseInt(x, 10)); const pb = String(b || '').split(/[.-]/).map((x) => parseInt(x, 10));
@@ -59,7 +63,7 @@ class Machines {
   pub(m) {
     const st = this.reach.get(m.id) || {};
     const c = cmpVersion(st.version, this.localVersion);
-    return { id: m.id, name: m.name, url: m.url, host: new URL(m.url).host, addedAt: m.addedAt, online: st.online ?? null, version: st.version || null, localVersion: this.localVersion, versionDiff: c < 0 ? 'older' : c > 0 ? 'newer' : null, checkedAt: st.at || null, error: st.error || null, downSince: (this.down.get(m.id) || {}).since || null };
+    return { id: m.id, name: m.name, url: m.url, host: new URL(m.url).host, addedAt: m.addedAt, online: st.online ?? null, version: st.version || null, localVersion: this.localVersion, versionDiff: c < 0 ? 'older' : c > 0 ? 'newer' : null, checkedAt: st.at || null, error: st.error || null, keyRefused: st.code === 'MACHINE_KEY', downSince: (this.down.get(m.id) || {}).since || null };
   }
 
   /**
@@ -118,7 +122,7 @@ class Machines {
         let buf = '';
         res.setEncoding('utf8');
         res.on('data', (c) => { buf += c; });
-        res.on('end', () => { let j = null; try { j = JSON.parse(buf); } catch { /* no JSON */ } if (res.statusCode >= 400) reject(new Error(res.statusCode === 401 ? T('The other machine refuses the key (revoked or remote access off) – please pair again.') : (j && j.error) || `HTTP ${res.statusCode}`)); else resolve(j); });
+        res.on('end', () => { let j = null; try { j = JSON.parse(buf); } catch { /* no JSON */ } if (res.statusCode >= 400) reject(Object.assign(new Error(res.statusCode === 401 ? T('The other machine refuses the key (revoked or remote access off) – please pair again.') : (j && j.error) || `HTTP ${res.statusCode}`), res.statusCode === 401 ? { code: 'MACHINE_KEY' } : {})); else resolve(j); });
       });
       req.on('error', reject);
       req.on('timeout', () => req.destroy(new Error(T('Timeout'))));
@@ -143,7 +147,7 @@ class Machines {
         res.on('data', (c) => chunks.push(c));
         res.on('end', () => {
           const buf = Buffer.concat(chunks);
-          if (res.statusCode >= 400) { let j = null; try { j = JSON.parse(buf.toString('utf8')); } catch { /* no JSON */ } return reject(new Error(res.statusCode === 401 ? T('The other machine refuses the key – please pair again.') : (j && j.error) || `HTTP ${res.statusCode}`)); }
+          if (res.statusCode >= 400) { let j = null; try { j = JSON.parse(buf.toString('utf8')); } catch { /* no JSON */ } return reject(new Error(res.statusCode === 401 ? T('The other machine refuses the key (revoked or remote access off) – please pair again.') : (j && j.error) || `HTTP ${res.statusCode}`)); }
           if (raw) return resolve(buf);
           try { resolve(JSON.parse(buf.toString('utf8'))); } catch { resolve(null); }
         });
@@ -158,7 +162,7 @@ class Machines {
   /** Fehlerantwort der Gegenseite → Error (401 = Schlüssel abgelehnt). */
   static httpError(status, buf) {
     let j = null; try { j = JSON.parse(buf.toString('utf8')); } catch { /* no JSON */ }
-    return new Error(status === 401 ? T('The other machine refuses the key – please pair again.') : (j && j.error) || `HTTP ${status}`);
+    return new Error(status === 401 ? T('The other machine refuses the key (revoked or remote access off) – please pair again.') : (j && j.error) || `HTTP ${status}`);
   }
 
   /**
@@ -166,7 +170,7 @@ class Machines {
    * "move" uses it: transfer.remoteUpload). source = file path (with content-length) or a readable stream (chunked).
    * Answer as JSON (or null). Same protection as raw(): certificate fingerprint first, then the key.
    */
-  async rawFile(mid, method, p, source, { timeout = 3600000, type = 'application/octet-stream' } = {}) {
+  async rawFile(mid, method, p, source, { timeout = 3600000, type = 'application/octet-stream', grace = 1500 } = {}) {
     const m = this.get(mid);
     const isPath = typeof source === 'string';
     const size = isPath ? fs.statSync(source).size : null;
@@ -174,7 +178,15 @@ class Machines {
     const u = new URL(m.url);
     return new Promise((resolve, reject) => {
       let done = false;
-      const fail = (e) => { if (!done) { done = true; reject(e); } };
+      let early = null;
+      const fail = (e) => { if (!done) { done = true; clearTimeout(early); reject(e); } };
+      // The other side refused early (too big, no space …) and closed while we were still sending: the write fails with
+      // ECONNABORTED/ECONNRESET/EPIPE. Its answer may still arrive – give it a moment instead of reporting the bare socket error.
+      const broken = (e) => {
+        if (done) return;
+        if (!UPLOAD_CUT.has(e && e.code)) { req.destroy(); fail(e); return; }
+        if (!early) early = setTimeout(() => { req.destroy(); fail(Object.assign(new Error(T('The other machine stopped the upload early ({code}) – its reason did not arrive. Check free space and size limits there.', { code: e.code })), { code: e.code })); }, grace);
+      };
       const req = https.request({ host: u.hostname, port: Number(u.port) || 443, method, path: `/api${p}`, createConnection: () => sock, timeout,
         headers: { 'x-hostwerk-key': secrets.open(m.key), accept: 'application/json', 'content-type': type, ...(size != null ? { 'content-length': size } : { 'transfer-encoding': 'chunked' }) } }, (res) => {
         const chunks = [];
@@ -183,15 +195,15 @@ class Machines {
           if (done) return;
           const buf = Buffer.concat(chunks);
           if (res.statusCode >= 400) return fail(Machines.httpError(res.statusCode, buf));
-          done = true;
+          done = true; clearTimeout(early);
           try { resolve(JSON.parse(buf.toString('utf8'))); } catch { resolve(null); }
         });
-        res.on('error', fail);
+        res.on('error', (e) => { if (chunks.length || !UPLOAD_CUT.has(e && e.code)) fail(e); else broken(e); });
       });
-      req.on('error', fail);
+      req.on('error', broken);
       req.on('timeout', () => req.destroy(new Error(T('Timeout during the transfer'))));
       const input = isPath ? fs.createReadStream(source) : source;
-      pipeline(input, req, (e) => { if (e) { req.destroy(); fail(e); } });
+      pipeline(input, req, (e) => { if (e) broken(e); });
     });
   }
 
@@ -229,15 +241,27 @@ class Machines {
   async add({ code, name }) {
     let c;
     try { c = JSON.parse(Buffer.from(String(code || '').trim(), 'base64url').toString('utf8')); } catch { throw new Error(T('The pairing code is invalid – please copy all of it.')); }
-    if (!c || c.v !== 1 || !Array.isArray(c.u) || !c.k || !c.f) throw new Error(T('The pairing code is invalid.'));
+    const urls = c && Array.isArray(c.u) ? c.u.filter((u) => { try { return new URL(u).protocol === 'https:'; } catch { return false; } }) : [];
+    if (!c || c.v !== 1 || !urls.length || !c.k || !c.f) throw new Error(T('The pairing code is invalid.'));
+    // Gleiches Zertifikat = derselbe Rechner: gleicher Schlüssel → schon gekoppelt; neuer Schlüssel (alter widerrufen) →
+    // an Ort und Stelle neu koppeln – ID, Name, Sicherungen und Aufgaben bleiben (statt eines zweiten Eintrags)
+    const known = this.list.find((x) => norm(x.fp) === norm(c.f));
+    let knownKey = null; try { knownKey = known ? secrets.open(known.key) : null; } catch { /* nicht lesbar → neu koppeln */ }
+    if (known && knownKey === c.k) throw Object.assign(new Error(T('This machine is already paired.')), { status: 409 });
     const sealed = secrets.seal(c.k);
     let last = null;
     // Take the first reachable address (domain, otherwise home network address)
-    for (const url of c.u) {
-      const m = { id: crypto.randomBytes(5).toString('hex'), name: String(name || c.n || new URL(url).hostname).slice(0, 60), url, key: sealed, fp: c.f, addedAt: Date.now() };
+    for (const url of urls) {
+      const m = { id: crypto.randomBytes(5).toString('hex'), name: label(name) || label(c.n) || new URL(url).hostname, url, key: sealed, fp: c.f, addedAt: Date.now() };
       try {
         const ping = await this.request(m, 'GET', '/app/ping');
-        if (this.list.some((x) => norm(x.fp) === norm(c.f) && x.url === url)) throw new Error(T('This machine is already paired.'));
+        if (known) {
+          Object.assign(known, { url, key: sealed }, label(name) ? { name: label(name) } : {});
+          this.ctx.settings.save();
+          this.down.delete(known.id);
+          this.reach.set(known.id, { online: true, version: ping.version, at: Date.now() });
+          return this.pub(known);
+        }
         this.list.push(m);
         this.ctx.settings.save();
         this.reach.set(m.id, { online: true, version: ping.version, at: Date.now() });
@@ -247,12 +271,12 @@ class Machines {
     throw last || new Error(T('The other machine cannot be reached.'));
   }
 
-  remove(id) { const s = this.ctx.settings.get(); s.machines = this.list.filter((m) => m.id !== id); this.ctx.settings.save(); this.reach.delete(id); }
-  rename(id, name) { const m = this.get(id); m.name = String(name || m.name).slice(0, 60); this.ctx.settings.save(); return this.pub(m); }
+  remove(id) { const s = this.ctx.settings.get(); s.machines = this.list.filter((m) => m.id !== id); this.ctx.settings.save(); this.reach.delete(id); this.down.delete(id); }
+  rename(id, name) { const m = this.get(id); m.name = label(name) || m.name; this.ctx.settings.save(); return this.pub(m); }
 
   async status() {
     await Promise.all(this.list.map(async (m) => {
-      try { const p = await this.request(m, 'GET', '/app/ping'); this.reach.set(m.id, { online: true, version: p.version, at: Date.now() }); } catch (e) { this.reach.set(m.id, { online: false, error: e.message, at: Date.now() }); }
+      try { const p = await this.request(m, 'GET', '/app/ping'); this.reach.set(m.id, { online: true, version: p.version, at: Date.now() }); } catch (e) { this.reach.set(m.id, { online: false, error: e.message, code: e.code || null, at: Date.now() }); }
     }));
     return this.list.map((m) => this.pub(m));
   }
@@ -271,6 +295,8 @@ class Machines {
     else if (req.headers['content-length']) headers['content-length'] = req.headers['content-length'];
     const q = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
     const out = https.request({ host: u.hostname, port: Number(u.port) || 443, method: req.method, path: `/api/${rest}${q}`, createConnection: () => sock, headers }, (r) => {
+      // 401 der Gegenseite heißt: unser Schlüssel gilt dort nicht mehr – nicht als „Nicht angemeldet“ hier durchreichen
+      if (r.statusCode === 401) { r.resume(); res.status(502).json({ error: T('The other machine refuses the key (revoked or remote access off) – please pair again.'), code: 'MACHINE_KEY' }); return; }
       const h = { ...r.headers };
       delete h['set-cookie'];
       res.writeHead(r.statusCode, h);

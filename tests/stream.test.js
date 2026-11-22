@@ -28,9 +28,12 @@ async function other(t) {
       req.on('end', () => { seen.push({ len: req.headers['content-length'] || null, chunked: req.headers['transfer-encoding'] === 'chunked' }); res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ bytes: n, sha: h.digest('hex') })); });
       return;
     }
+    // Refuses at once and closes without reading the upload (like a full disk or a size limit on the other machine)
+    if (req.url === '/api/toobig') { res.writeHead(413, { 'content-type': 'application/json', connection: 'close' }); res.end(JSON.stringify({ error: 'Too big for this machine' }), () => req.socket.destroy()); return; }
     if (req.url === '/api/pkg') { res.writeHead(200, { 'content-type': 'application/octet-stream' }); Readable.from([big.subarray(0, 1048576), big.subarray(1048576)]).pipe(res); return; }
     if (req.url === '/api/half') { res.writeHead(200, { 'content-length': 1000 }); res.write(Buffer.alloc(100)); setTimeout(() => res.destroy(), 20); return; }
-    res.writeHead(404, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'No such package' }));
+    // Erst den Upload lesen, dann 404 – sonst setzt Windows die Verbindung zurück (RST) und die Antwort geht verloren (flackernder Test)
+    req.resume(); req.on('end', () => { res.writeHead(404, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'No such package' })); });
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const S = { machines: [{ id: 'abcdef0123', name: 'Other', url: `https://127.0.0.1:${srv.address().port}`, key: 'sealed:secret-key', fp: new crypto.X509Certificate(pems.cert).fingerprint256 }] };
@@ -60,4 +63,20 @@ test('download writes straight into the file; errors leave nothing behind', asyn
   await assert.rejects(o.m.download('abcdef0123', '/missing', path.join(dir, 'x.bin')), /No such package/);
   await assert.rejects(o.m.download('abcdef0123', '/half', path.join(dir, 'half.bin')));
   assert.deepStrictEqual(fs.readdirSync(dir), ['got.bin'], 'no half or .part file');
+});
+
+test('an upload the other side refuses early: its message or a clear text – never the bare socket error', async (t) => {
+  const o = await other(t); if (!o) return;
+  const file = path.join(tmp(), 'big.bin'); fs.writeFileSync(file, Buffer.alloc(8 * 1048576));
+  await assert.rejects(o.m.rawFile('abcdef0123', 'POST', '/toobig', file, { grace: 300 }), (e) => /Too big for this machine|stopped the upload early/.test(e.message) && !/^write /.test(e.message));
+});
+
+test('a refused key shows as keyRefused in the list ("Pair again")', async (t) => {
+  const o = await other(t); if (!o) return;
+  let list = await o.m.status();
+  assert.strictEqual(list[0].keyRefused, false);
+  o.m.list[0].key = 'sealed:revoked';
+  list = await o.m.status();
+  assert.strictEqual(list[0].online, false);
+  assert.strictEqual(list[0].keyRefused, true);
 });
